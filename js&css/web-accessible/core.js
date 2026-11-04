@@ -528,6 +528,10 @@ document.addEventListener('it-message-from-extension', function () {
 					ImprovedTube.playerHideProgressPreview();
 					break
 
+				case 'playerDisablePreciseSeeking':
+					ImprovedTube.playerDisablePreciseSeeking();
+					break
+
 				case 'playerWatchedSegments':
 					ImprovedTube.watchedSegments.init();
 					break
