@@ -196,6 +196,7 @@ ImprovedTube.init = function () {
 	this.shortcutsInit();
 	this.onkeydown();
 	this.onmousedown();
+	this.playerDisablePreciseSeeking();
 	this.youtubeLanguage();
 	this.myColors();
 	this.YouTubeExperiments();

@@ -2183,6 +2183,104 @@ ImprovedTube.pauseWhileTypingOnYoutube = function () {
 };
 
 /*------------------------------------------------------------------------------
+DISABLE PRECISE SEEKING
+------------------------------------------------------------------------------*/
+ImprovedTube.playerDisablePreciseSeeking = function () {
+	if (this._preciseSeekingCleanup) {
+		this._preciseSeekingCleanup();
+		delete this._preciseSeekingCleanup;
+	}
+	const enabled = this.storage.player_disable_precise_seeking === true;
+	if (!enabled) {
+		document.documentElement.removeAttribute('it-player-disable-precise-seeking');
+		return;
+	}
+	document.documentElement.setAttribute('it-player-disable-precise-seeking', 'true');
+
+	let drag = null;
+	let clickPlayer = null;
+	let clickTimer;
+	const types = ['mousedown', 'mousemove', 'mouseup', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'click', 'dblclick', 'dragstart', 'blur'];
+	function block (event) {
+		event.preventDefault();
+		event.stopImmediatePropagation();
+	}
+	function finish () {
+		drag = null;
+		// The browser dispatches a click after mouseup, sometimes on the video
+		// when the drag ends outside the bar. Do not let it toggle playback.
+		clearTimeout(clickTimer);
+		clickTimer = setTimeout(function () { clickPlayer = null; }, 0);
+	}
+	function seek (event) {
+		const fraction = Math.max(0, Math.min(1, (event.clientX - drag.rect.left) / drag.rect.width));
+		if (fraction === drag.lastFraction) { return; }
+		drag.lastFraction = fraction;
+		drag.player.seekTo(fraction * drag.duration, true);
+	}
+	function handle (event) {
+		if (event.type === 'blur') {
+			finish();
+			return;
+		}
+		const pointer = event.type.startsWith('pointer');
+		// This setting controls the desktop mouse gesture.
+		if (pointer && event.pointerType !== 'mouse') { return; }
+		if (['click', 'dblclick', 'dragstart'].includes(event.type)) {
+			const bar = event.target.closest?.('.ytp-progress-bar');
+			const player = bar?.closest('.html5-video-player');
+			if ((player && typeof player.seekTo === 'function') ||
+				(clickPlayer && (event.target === clickPlayer || clickPlayer.contains(event.target)))) {
+				block(event);
+			}
+			return;
+		}
+		if (event.type.endsWith('down')) {
+			if (drag) {
+				block(event);
+				return;
+			}
+			const bar = event.target.closest?.('.ytp-progress-bar');
+			const player = bar?.closest('.html5-video-player');
+			if (event.button !== 0 || !player || typeof player.seekTo !== 'function' ||
+				player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')) { return; }
+			const duration = player.getDuration();
+			if (!Number.isFinite(duration) || duration <= 0) { return; }
+			const rect = bar.getBoundingClientRect();
+			if (rect.width <= 0) { return; }
+			// Never start YouTube's drag handler: it owns both the precise-seek
+			// panel and the pause-on-drag behavior. Seek directly using X only.
+			block(event);
+			drag = {bar, player, duration, pointer, pointerId: event.pointerId, rect, lastFraction: null};
+			clearTimeout(clickTimer);
+			clickPlayer = player;
+			bar.focus({preventScroll: true});
+			seek(event);
+			return;
+		}
+		if (!drag) { return; }
+		if (pointer && (!drag.pointer || event.pointerId !== drag.pointerId)) { return; }
+		// Suppress compatibility mouse events during a pointer drag too.
+		block(event);
+		if (drag.pointer !== pointer) { return; }
+		if (!drag.bar.isConnected) { finish(); return; }
+		if (event.type.endsWith('cancel') || (event.type.endsWith('move') && !(event.buttons & 1))) {
+			finish();
+			return;
+		}
+		seek(event);
+		if (event.type.endsWith('up')) { finish(); }
+	}
+	// Window capture also covers drags that leave the bar and replacement players
+	// created by YouTube's single-page navigation.
+	for (const type of types) { window.addEventListener(type, handle, true); }
+	this._preciseSeekingCleanup = function () {
+		for (const type of types) { window.removeEventListener(type, handle, true); }
+		clearTimeout(clickTimer);
+	};
+};
+
+/*------------------------------------------------------------------------------
 HIDE PROGRESS BAR PREVIEW
 ------------------------------------------------------------------------------*/
 ImprovedTube.playerHideProgressPreview = function () {

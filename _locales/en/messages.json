@@ -1938,6 +1938,10 @@
   "smartSpeedSelectLanguagePlaceholder": {
     "message": "Select Language..."
   },
+  "disablePreciseSeeking": {
+    "message": "Disable precise seeking",
+    "description": "Prevents dragging upward on the progress bar from opening precise seeking."
+  },
   "smartSpeedAddSelectedLanguage": {
     "message": "➕ Add Selected Language"
   }
